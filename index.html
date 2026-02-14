@@ -1,0 +1,423 @@
+<!doctype html>
+<html lang="pt">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Stock – Frutas & Legumes</title>
+  <style>
+    :root { --bg:#0b1220; --card:#121a2b; --text:#e9eefc; --muted:#a9b4d6; --line:#24304d; --accent:#4da3ff; --danger:#ff5b6e; }
+    * { box-sizing: border-box; }
+    body { margin:0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; background: linear-gradient(180deg, #070c16, var(--bg)); color: var(--text); }
+    header { padding: 18px 16px 10px; position: sticky; top: 0; backdrop-filter: blur(10px); background: rgba(11,18,32,.75); border-bottom: 1px solid rgba(36,48,77,.7); z-index: 10; }
+    h1 { margin:0; font-size: 18px; font-weight: 700; letter-spacing:.2px; }
+    .sub { margin-top:6px; color: var(--muted); font-size: 12px; }
+    .wrap { padding: 14px 16px 80px; max-width: 980px; margin: 0 auto; }
+    .row { display:flex; gap:10px; flex-wrap: wrap; align-items: center; }
+    .pillbar { display:flex; gap:8px; flex-wrap: wrap; margin-top: 10px; }
+    .pill { border:1px solid var(--line); background: rgba(18,26,43,.7); color: var(--text); padding: 8px 10px; border-radius: 999px; font-size: 13px; cursor:pointer; user-select:none; }
+    .pill.active { border-color: rgba(77,163,255,.9); box-shadow: 0 0 0 2px rgba(77,163,255,.15) inset; }
+    .card { background: rgba(18,26,43,.7); border: 1px solid rgba(36,48,77,.8); border-radius: 14px; padding: 12px; margin-top: 12px; }
+    .card h2 { margin:0 0 10px; font-size: 14px; color: var(--muted); font-weight: 700; }
+    .btn { border:1px solid var(--line); background: rgba(18,26,43,.9); color: var(--text); padding: 10px 12px; border-radius: 12px; font-size: 13px; cursor:pointer; }
+    .btn.primary { border-color: rgba(77,163,255,.7); background: rgba(77,163,255,.15); }
+    .btn.danger { border-color: rgba(255,91,110,.7); background: rgba(255,91,110,.12); }
+    .btn:active { transform: translateY(1px); }
+    input[type="text"], textarea, select {
+      width: 100%; border:1px solid rgba(36,48,77,.9); background: rgba(7,12,22,.55); color: var(--text);
+      border-radius: 12px; padding: 10px 12px; font-size: 14px; outline: none;
+    }
+    textarea { min-height: 160px; resize: vertical; }
+    .grid { display:grid; grid-template-columns: 1fr; gap:10px; }
+    @media (min-width: 760px){ .grid.two { grid-template-columns: 1fr 1fr; } }
+    table { width:100%; border-collapse: collapse; }
+    th, td { padding: 10px 8px; border-bottom: 1px solid rgba(36,48,77,.75); vertical-align: middle; }
+    th { text-align:left; font-size: 12px; color: var(--muted); font-weight: 700; }
+    td.name { width: 55%; font-size: 13px; }
+    td.qty { width: 45%; }
+    .small { font-size: 12px; color: var(--muted); }
+    .muted { color: var(--muted); }
+    .footerbar {
+      position: fixed; bottom: 0; left:0; right:0;
+      background: rgba(11,18,32,.85); border-top: 1px solid rgba(36,48,77,.8);
+      padding: 10px 12px; display:flex; gap:10px; justify-content: center; backdrop-filter: blur(10px);
+    }
+    .hide { display:none !important; }
+    .toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: 74px; background: rgba(0,0,0,.65); border:1px solid rgba(255,255,255,.12); color: #fff;
+      padding: 10px 12px; border-radius: 999px; font-size: 13px; z-index: 20; opacity: 0; pointer-events: none; transition: opacity .2s ease; }
+    .toast.show { opacity: 1; }
+    .search { flex:1; min-width: 220px; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Stock – Frutas & Legumes</h1>
+    <div class="sub">Quantidades em campo livre (ex: “10 kg”, “3 cx”, “12 un”). Fica guardado automaticamente.</div>
+    <div class="pillbar" id="tabs"></div>
+  </header>
+
+  <div class="wrap">
+    <div class="row">
+      <input class="search" id="search" type="text" placeholder="Pesquisar produto…" />
+      <button class="btn" id="btnConfig">Configurar produtos</button>
+    </div>
+
+    <div class="card" id="stockCard">
+      <div class="row" style="justify-content: space-between; align-items: baseline;">
+        <h2 id="catTitle">Produtos</h2>
+        <div class="small" id="countInfo"></div>
+      </div>
+      <div style="overflow:auto;">
+        <table>
+          <thead>
+            <tr><th>Produto</th><th>Quantidade</th></tr>
+          </thead>
+          <tbody id="tableBody"></tbody>
+        </table>
+      </div>
+      <div class="small" style="margin-top:10px;">
+        Dica: escreve exatamente como te der jeito (ex: “2 caixas + 3 un”, “encomendado”, “stock baixo”…).
+      </div>
+    </div>
+
+    <div class="card hide" id="configCard">
+      <h2>Configurar lista de produtos</h2>
+      <div class="grid two">
+        <div>
+          <label class="small">Categoria</label>
+          <select id="cfgCategory"></select>
+          <div class="small" style="margin-top:8px;">
+            Cola aqui a lista (um produto por linha). Podes copiar diretamente do Excel e colar.
+          </div>
+        </div>
+        <div>
+          <label class="small">Ações</label>
+          <div class="row" style="margin-top:6px;">
+            <button class="btn primary" id="btnSaveList">Guardar lista</button>
+            <button class="btn danger" id="btnClearList">Limpar lista desta categoria</button>
+          </div>
+          <div class="row" style="margin-top:10px;">
+            <button class="btn" id="btnExport">Exportar backup</button>
+            <button class="btn" id="btnImport">Importar backup</button>
+          </div>
+          <div class="small" style="margin-top:8px;">
+            Backup serve para copiares/guardares noutro sítio ou mover para outro telemóvel.
+          </div>
+        </div>
+      </div>
+
+      <div style="margin-top:10px;">
+        <textarea id="cfgTextarea" placeholder="Exemplo:
+Abacate Hass
+Banana
+Laranja de Sumo"></textarea>
+      </div>
+
+      <div class="small muted" style="margin-top:10px;">
+        Nota: a lista e as quantidades ficam guardadas no dispositivo (navegador). Se apagares dados do Safari/Chrome, perdes o registo.
+      </div>
+    </div>
+  </div>
+
+  <div class="footerbar">
+    <button class="btn" id="btnResetQty">Limpar quantidades</button>
+    <button class="btn danger" id="btnResetAll">Reset total</button>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+<script>
+  // ----- Storage keys -----
+  const KEY_PRODUCTS = "stock_app_products_v1";
+  const KEY_QTY      = "stock_app_qty_v1";
+
+  // Default categories (podes adicionar/remover depois facilmente)
+  const DEFAULT_CATEGORIES = ["Frutas", "Legumes & Veg", "Plantas", "Tropicais", "4ª Gama"];
+
+  // ----- State -----
+  let categories = [...DEFAULT_CATEGORIES];
+  let productsByCat = loadProducts();  // { cat: [name, ...] }
+  let qty = loadQty();                 // { "Cat||Product": "10 kg" }
+  let activeCat = categories[0];
+
+  // ----- Helpers -----
+  function toast(msg){
+    const el = document.getElementById("toast");
+    el.textContent = msg;
+    el.classList.add("show");
+    setTimeout(()=> el.classList.remove("show"), 1400);
+  }
+
+  function keyOf(cat, product){ return cat + "||" + product; }
+
+  function saveProducts(){
+    localStorage.setItem(KEY_PRODUCTS, JSON.stringify(productsByCat));
+  }
+  function loadProducts(){
+    try {
+      const raw = localStorage.getItem(KEY_PRODUCTS);
+      if(!raw){
+        // initialize empty categories
+        const init = {};
+        DEFAULT_CATEGORIES.forEach(c => init[c] = []);
+        return init;
+      }
+      const obj = JSON.parse(raw);
+      // Ensure default categories exist
+      DEFAULT_CATEGORIES.forEach(c => { if(!obj[c]) obj[c] = []; });
+      return obj;
+    } catch {
+      const init = {};
+      DEFAULT_CATEGORIES.forEach(c => init[c] = []);
+      return init;
+    }
+  }
+
+  function saveQty(){
+    localStorage.setItem(KEY_QTY, JSON.stringify(qty));
+  }
+  function loadQty(){
+    try { return JSON.parse(localStorage.getItem(KEY_QTY) || "{}"); }
+    catch { return {}; }
+  }
+
+  function setActiveCat(cat){
+    activeCat = cat;
+    renderTabs();
+    renderTable();
+    document.getElementById("cfgCategory").value = cat;
+    document.getElementById("cfgTextarea").value = (productsByCat[cat] || []).join("\n");
+  }
+
+  function renderTabs(){
+    const tabs = document.getElementById("tabs");
+    tabs.innerHTML = "";
+    categories.forEach(cat => {
+      const b = document.createElement("button");
+      b.className = "pill" + (cat === activeCat ? " active" : "");
+      b.textContent = cat;
+      b.onclick = () => setActiveCat(cat);
+      tabs.appendChild(b);
+    });
+  }
+
+  function normalizeLines(text){
+    return text
+      .split(/\r?\n/)
+      .map(s => s.trim())
+      .filter(Boolean)
+      .filter(s => s.length > 1);
+  }
+
+  function renderTable(){
+    const tbody = document.getElementById("tableBody");
+    const search = (document.getElementById("search").value || "").trim().toLowerCase();
+
+    const list = (productsByCat[activeCat] || [])
+      .slice()
+      .sort((a,b)=> a.localeCompare(b, "pt", { sensitivity:"base" }));
+
+    const filtered = search
+      ? list.filter(name => name.toLowerCase().includes(search))
+      : list;
+
+    document.getElementById("catTitle").textContent = activeCat;
+    document.getElementById("countInfo").textContent =
+      filtered.length + " produto(s)" + (search ? " (filtrado)" : "");
+
+    tbody.innerHTML = "";
+
+    if(filtered.length === 0){
+      const tr = document.createElement("tr");
+      const td = document.createElement("td");
+      td.colSpan = 2;
+      td.className = "small muted";
+      td.style.padding = "14px 8px";
+      td.innerHTML = "Sem produtos nesta categoria. Clica em <b>Configurar produtos</b> e cola a tua lista (um por linha).";
+      tr.appendChild(td);
+      tbody.appendChild(tr);
+      return;
+    }
+
+    filtered.forEach(name => {
+      const tr = document.createElement("tr");
+
+      const tdName = document.createElement("td");
+      tdName.className = "name";
+      tdName.textContent = name;
+
+      const tdQty = document.createElement("td");
+      tdQty.className = "qty";
+      const inp = document.createElement("input");
+      inp.type = "text";
+      inp.placeholder = "ex: 10 kg / 3 cx / 12 un";
+      inp.value = qty[keyOf(activeCat, name)] || "";
+      inp.oninput = () => {
+        qty[keyOf(activeCat, name)] = inp.value;
+        saveQty();
+      };
+      tdQty.appendChild(inp);
+
+      tr.appendChild(tdName);
+      tr.appendChild(tdQty);
+      tbody.appendChild(tr);
+    });
+  }
+
+  // ----- Config UI -----
+  function showConfig(show){
+    document.getElementById("configCard").classList.toggle("hide", !show);
+    document.getElementById("stockCard").classList.toggle("hide", show);
+    document.getElementById("btnConfig").textContent = show ? "Voltar ao stock" : "Configurar produtos";
+    if(show){
+      document.getElementById("cfgCategory").value = activeCat;
+      document.getElementById("cfgTextarea").value = (productsByCat[activeCat] || []).join("\n");
+    }
+  }
+
+  // Export / Import backup as JSON text file
+  function downloadText(filename, text){
+    const blob = new Blob([text], {type:"application/json"});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  }
+
+  function pickFile(accept, cb){
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = accept;
+    input.onchange = () => {
+      const file = input.files && input.files[0];
+      if(!file) return;
+      const reader = new FileReader();
+      reader.onload = () => cb(reader.result);
+      reader.readAsText(file);
+    };
+    input.click();
+  }
+
+  // ----- Wire up -----
+  (function init(){
+    // ensure categories exist
+    categories = Array.from(new Set([...DEFAULT_CATEGORIES, ...Object.keys(productsByCat)]));
+    if(!categories.includes(activeCat)) activeCat = categories[0];
+
+    // tabs + config category select
+    renderTabs();
+    const sel = document.getElementById("cfgCategory");
+    sel.innerHTML = "";
+    categories.forEach(c => {
+      const opt = document.createElement("option");
+      opt.value = c; opt.textContent = c;
+      sel.appendChild(opt);
+    });
+    sel.onchange = () => setActiveCat(sel.value);
+
+    document.getElementById("search").addEventListener("input", renderTable);
+
+    document.getElementById("btnConfig").onclick = () => {
+      const isHidden = document.getElementById("configCard").classList.contains("hide");
+      showConfig(isHidden);
+    };
+
+    document.getElementById("btnSaveList").onclick = () => {
+      const cat = document.getElementById("cfgCategory").value;
+      const lines = normalizeLines(document.getElementById("cfgTextarea").value);
+      productsByCat[cat] = lines;
+      saveProducts();
+      toast("Lista guardada");
+      setActiveCat(cat);
+      showConfig(false);
+    };
+
+    document.getElementById("btnClearList").onclick = () => {
+      const cat = document.getElementById("cfgCategory").value;
+      if(!confirm("Limpar a lista de produtos desta categoria?")) return;
+      productsByCat[cat] = [];
+      saveProducts();
+      toast("Lista limpa");
+      setActiveCat(cat);
+      document.getElementById("cfgTextarea").value = "";
+    };
+
+    document.getElementById("btnResetQty").onclick = () => {
+      if(!confirm("Limpar todas as quantidades?")) return;
+      qty = {};
+      saveQty();
+      toast("Quantidades limpas");
+      renderTable();
+    };
+
+    document.getElementById("btnResetAll").onclick = () => {
+      if(!confirm("Reset total: apagar listas e quantidades?")) return;
+      localStorage.removeItem(KEY_PRODUCTS);
+      localStorage.removeItem(KEY_QTY);
+      productsByCat = loadProducts();
+      qty = {};
+      categories = [...DEFAULT_CATEGORIES];
+      activeCat = categories[0];
+      // rebuild select
+      const sel = document.getElementById("cfgCategory");
+      sel.innerHTML = "";
+      categories.forEach(c => {
+        const opt = document.createElement("option");
+        opt.value = c; opt.textContent = c;
+        sel.appendChild(opt);
+      });
+      renderTabs();
+      renderTable();
+      toast("Reset feito");
+      showConfig(false);
+    };
+
+    document.getElementById("btnExport").onclick = () => {
+      const payload = {
+        version: 1,
+        exportedAt: new Date().toISOString(),
+        productsByCat,
+        qty
+      };
+      downloadText("backup-stock.json", JSON.stringify(payload, null, 2));
+      toast("Backup exportado");
+    };
+
+    document.getElementById("btnImport").onclick = () => {
+      pickFile(".json,application/json", (text) => {
+        try {
+          const obj = JSON.parse(text);
+          if(!obj.productsByCat) throw new Error("Formato inválido");
+          productsByCat = obj.productsByCat;
+          qty = obj.qty || {};
+          // ensure default cats
+          DEFAULT_CATEGORIES.forEach(c => { if(!productsByCat[c]) productsByCat[c] = []; });
+          saveProducts();
+          saveQty();
+          categories = Array.from(new Set([...DEFAULT_CATEGORIES, ...Object.keys(productsByCat)]));
+          renderTabs();
+          // rebuild select
+          const sel = document.getElementById("cfgCategory");
+          sel.innerHTML = "";
+          categories.forEach(c => {
+            const opt = document.createElement("option");
+            opt.value = c; opt.textContent = c;
+            sel.appendChild(opt);
+          });
+          if(!categories.includes(activeCat)) activeCat = categories[0];
+          setActiveCat(activeCat);
+          toast("Backup importado");
+        } catch (e){
+          alert("Não consegui importar. Confirma se escolheste um backup criado por esta app.");
+        }
+      });
+    };
+
+    // first render
+    renderTable();
+  })();
+</script>
+</body>
+</html>
